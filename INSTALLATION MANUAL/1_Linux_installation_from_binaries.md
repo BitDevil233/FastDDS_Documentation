@@ -36,10 +36,9 @@ export LD_LIBRARY_PATH=/usr/local/lib/
 通过执行以下操作将其永久添加到PATH中：
 ```
 echo 'export LD_LIBRARY_PATH=/usr/local/lib/' >> ~/.bashrc
-
 ```
 
-### 1.1.3.在CMake项目中include Fast DDS
+### 1.1.3.在CMake项目中包含 Fast DDS
 安装程序部署CMake配置文件，通过find_package CMake API将Fast-DDS合并到任何CMake项目中。
 
 通过设置CMake变量BUILD_SHARED_LIBS，可以在CMake生成器阶段选择所需的链接（动态或静态库）。如果变量丢失，则生成过程将默认为静态链接。

@@ -55,8 +55,8 @@ Fast DDS Docs是一个开源项目，因此，所有以反馈和内容生成形�
 ## 文件结构
 本文档分为以下几个部分。
 - 安装手册
-- 快速DDS
-- 快速DDS生成
+- Fast DDS
+- Fast DDS Gen
 - 发行说明
 
 

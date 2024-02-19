@@ -8,7 +8,7 @@
 
 ## 1.1 安装
 eProsima Fast DDS for Linux的最新版本可在eProsisma网站的下载选项卡上找到。下载后，提取首选目录中的内容。然后，要在系统中安装eProsima Fast DDS及其所有依赖项，请使用管理权限执行install.sh脚本：
-```
+```shell
 cd <extraction_directory>
 sudo ./install.sh
 ```
@@ -34,7 +34,7 @@ src文件夹包含以下包：
 export LD_LIBRARY_PATH=/usr/local/lib/
 ```
 通过执行以下操作将其永久添加到PATH中：
-```
+```shell
 echo 'export LD_LIBRARY_PATH=/usr/local/lib/' >> ~/.bashrc
 ```
 
@@ -51,7 +51,7 @@ $cmake --build buildexample --target install
 
 ## 1.2.卸载
 要卸载所有已安装的组件，请执行uninstall.sh脚本（使用管理权限）：
-```
+```shell
 cd ＜extraction_directory＞
 sudo ./uninstall.sh
 ```
@@ -78,7 +78,7 @@ TO DO
 # 7. CMake选项
 eProsima Fast DDS提供了许多CMake选项，用于更改Fast DDS的行为和配置。这些选项允许用户通过在CMake执行时将这些选项定义为ON/OFF来启用/禁用某些快速DDS设置。本节的结构如下：首先，描述了Fast DDS的一般配置的CMake选项；然后，提出了与第三方库相关的选择；最后，定义了构建FastDDS测试的可能选项。
 
-# 7.1. 一般选项
+## 7.1. 一般选项
 下面显示了用于配置常规设置的Fast DDS CMake选项，以及它们的描述和对其他选项的依赖关系。
 
 

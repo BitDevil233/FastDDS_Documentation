@@ -42,3 +42,66 @@ Fast DDS 支持通过各种传输协议实施应用程序。它们是 UDPv4、UD
 ## 2.2.编程和执行模型
 Fast DDS 是并发的且基于事件的。以下内容解释了控制 Fast DDS 操作的`多线程模型`以及可能发生的事件。
 ### 2.2.1.并发和多线程
+Fast DDS实现了一个并发多线程系统。每个DomainParticipant生成一组线程来处理后台任务，比如日志记录、消息接收和异步通信。这不应影响您使用库的方式，即Fast DDS API是线程安全的，因此您可以放心地从不同线程调用同一个DomainParticipant上的任何方法。然而，当外部函数访问被库内部运行的线程修改的资源时，必须考虑这种多线程实现。其中一个例子是实体监听器回调中修改的资源。
+Fast DDS 生成的完整`线程集`如下所示。仅当使用适当的传输时才会创建与传输相关的线程（标记为 UDP、TCP 和 SHM 类型）。
+|Name | Type | Cardinality | OS thread name | Description|
+|---|---|---|---|---|
+***`此表格待更新`***
+
+其中一些线程仅在满足某些条件时才会产生：
+
+- 仅当使用数据共享时才会创建数据共享侦听器线程。
+
+- 仅当 DomainParticipant 配置为 `Discovery Server SERVER`时，才会创建 Discovery Server 事件线程。
+
+- TCP 保活线程要求保活周期配置为大于零的值。
+
+- 安全日志记录和共享内存数据包日志记录线程都需要启用某些配置选项。
+
+- 仅当使用FASTDDS_ENVIRONMENT_FILE时才会生成文件监视线程。
+
+关于传输线程，Fast DDS 默认使用`UDP`和`共享内存`传输。可以配置端口配置以满足部署的特定需求，但默认配置是始终使用元流量端口和单播用户流量端口。这适用于UDP和共享内存，因为TCP不支持多播。更多信息可以在默认监听定位器页面找到。
+
+Fast DDS提供了通过 ThreadSettings 配置其创建的线程的某些属性的可能性。
+
+### 2.2.2事件驱动架构
+有一个`时间-事件`系统，使Fast DDS能够响应某些条件，并安排定期操作。其中很少对用户可见，因为大多数与 DDS 和 RTPS 元数据相关。然而，用户可以通过从该类继承来在其应用程序中定义周期性时间事件`TimedEvent`。
+## 2.3. 功能
+Fast DDS具有一些附加功能，用户可以在其应用程序中实现和配置这些功能。这些概述如下。
+
+### 2.3.1. 发现协议
+发现协议定义了在给定主题下发布的 DataWriter 和订阅同一主题的 DataReader 进行匹配的机制，以便它们可以开始共享数据。这适用于沟通过程中的任何时刻。Fast DDS提供以下发现机制：
+
+- 简单的发现。这是默认的发现机制，在RTPS 标准中定义，并提供与其他 DDS 实现的兼容性。这里，DomainParticipants 在早期阶段被单独发现，以便随后匹配它们实现的 DataWriter 和 DataReader。
+
+- 发现服务器。这种发现机制使用集中式发现架构，其中服务器充当元流量发现的中心。
+
+- 静态发现。这实现了 DomainParticipant 之间的发现，但如果远程 DomainParticipant 事先知道这些实体，则可以跳过每个 DomainParticipant (DataReader/DataWriter) 中包含的实体的发现。
+
+- 手动发现。该机制仅与RTPS层兼容。它允许用户使用其选择的任何外部元信息通道手动匹配和取消匹配 RTPSParticipants、RTPSWriters 和 RTPSReaders。
+
+Fast DDS中实现的所有发现协议的详细解释和配置可以在Discovery部分看到。
+
+### 2.3.2. 安全
+Fast DDS可配置为通过在三个级别实现可插拔安全性来提供安全通信：
+
+远程域参与者的身份验证。DDS :Auth:PKI-DH插件使用受信任的证书颁发机构 (CA) 和 ECDSA 数字签名算法提供身份验证来执行相互身份验证。它还使用椭圆曲线 Diffie-Hellman (ECDH) 密钥协商协议建立共享密钥。
+
+实体的访问控制。DDS :Access:Permissions插件在 DDS 域和主题级别提供对 DomainParticipants 的访问控制。
+
+数据加密。DDS :Crypto:AES-GCM-GMAC插件使用伽罗瓦计数器模式 (AES-GCM) 中的高级加密标准 (AES) 提供经过身份验证的加密。
+
+有关Fast DDS中安全配置的更多信息，请参阅安全部分。
+
+### 2.3.3. 记录
+Fast DDS提供了可扩展的日志记录系统。Log类是日志系统的入口点。它公开了三个宏定义以方便使用：`EPROSIMA_LOG_INFO`、`EPROSIMA_LOG_WARNING`和`EPROSIMA_LOG_ERROR`。此外，除了已有的类别（`INFO_MSG`、`WARN_MSG`、`ERROR_MSG`）之外，它还允许定义新类别。它使用正则表达式提供按类别过滤，以及对日志系统的详细程度的控制。可能的日志系统配置的详细信息可以在日志部分找到。
+
+### 2.3.4. XML 配置文件配置
+Fast DDS提供了使用 XML 配置文件来更改其默认设置的可能性。因此，可以修改DDS实体的行为，而无需用户实现任何程序源代码或重新构建现有应用程序。
+
+用户拥有每个 API 功能的 XML 标签。因此，可以通过 标签构建和配置 DomainParticipant 配置文件，或者分别使用和标签<participant>构建和配置 DataWriter 和 DataReader 配置文件。<data_writer><data_reader>
+
+为了更好地了解如何编写和使用这些 XML 配置文件配置文件，您可以继续阅读XML 配置文件部分。
+
+### 2.3.5。环境变量
+环境变量是通过操作系统功能在程序范围之外定义的变量。Fast DDS依赖于环境变量，因此用户可以轻松自定义 DDS 应用程序的默认设置。请参阅环境变量部分，了解影响Fast DDS的环境变量的完整列表和说明。

@@ -252,5 +252,184 @@ QoS 策略数据成员列表：
 |---|---|---|
 |kind|DurabilityQosPolicyKind|VOLATILE_DURABILITY_QOS for DataReaders TRANSIENT_LOCAL_DURABILITY_QOS for DataWriters|
 
+>**注意**
+>
+>该 QoS 策略涉及主题、数据读取器和数据写入器实体。
+它无法在已启用的实体上更改。
 
+>**重要**
+>
+>为了在 DataReader 中接收过去的样本，除了设置此 Qos 策略外，还需要将 ReliabilityQosPolicy设置为RELIABLE_RELIABILITY_QOS。
+
+>**警告**
+>
+>为了使 DataWriter 和 DataReader 匹配，它们必须遵循兼容性规则。有关更多详细信息，请参阅兼容性规则。
+
+**持久性Qos策略种类**
+
+有四个可能的值（请参阅DurabilityQosPolicyKind）：
+
+- `VOLATILE_DURABILITY_QOS`：过去的样本将被忽略，加入的 DataReader 会接收匹配后生成的样本。
+
+- `TRANSIENT_LOCAL_DURABILITY_QOS`：当新的 DataReader 加入时，其历史记录将填充过去的样本。
+
+- `TRANSIENT_DURABILITY_QOS`：当新的 DataReader 加入时，其历史记录将填充过去的样本，这些样本存储在持久性存储中（请参阅持久性服务）。
+
+- `PERSISTENT_DURABILITY_QOS`：（未实现）：所有样本都存储在永久存储器中，以便它们可以比系统会话更长久。
+
+**兼容性规则**
+
+为了在 DataReader 和 DataWriter 中的 DurabilityQosPolicy 具有不同种类值时保持它们之间的兼容性，DataWriter 种类必须高于或等于 DataReader 种类。不同种类之间的顺序是：
+
+`VOLATILE_DURABILITY_QOS` <<< `TRANSIENT_LOCAL_DURABILITY_QOS` <<< `TRANSIENT_DURABILITY_QOS` <<< `PERSISTENT_DURABILITY_QOS`
+
+包含可能组合的表格：
+
+|数据写入器类型 | 数据读取器类 | 兼容性 |
+|---|---|---|
+|VOLATILE_DURABILITY_QOS|VOLATILE_DURABILITY_QOS|是|
+|VOLATILE_DURABILITY_QOS|TRANSIENT_LOCAL_DURABILITY_QOS|否|
+|VOLATILE_DURABILITY_QOS|TRANSIENT_DURABILITY_QOS|否|
+|TRANSIENT_LOCAL_DURABILITY_QOS|VOLATILE_DURABILITY_QOS|是|
+|TRANSIENT_LOCAL_DURABILITY_QOS|TRANSIENT_LOCAL_DURABILITY_QOS|是|
+|TRANSIENT_LOCAL_DURABILITY_QOS|TRANSIENT_DURABILITY_QOS|否|
+|TRANSIENT_DURABILITY_QOS|VOLATILE_DURABILITY_QOS|是|
+|TRANSIENT_DURABILITY_QOS|TRANSIENT_LOCAL_DURABILITY_QOS|是|
+|TRANSIENT_DURABILITY_QOS|TRANSIENT_DURABILITY_QOS|是|
+
+**例子**
+*C++*
+```cpp
+DurabilityQosPolicy durability;
+//The DurabilityQosPolicy is default constructed with kind = VOLATILE_DURABILITY_QOS
+//Change the kind to TRANSIENT_LOCAL_DURABILITY_QOS
+durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+
+```
+##### 3.1.2.1.4.持久性服务(DurabilityService)Qos策略
+> **警告**
+>
+>此 QoS 策略将在未来版本中实施。
+[TODO待补充]
+
+##### 3.1.2.1.5. 实体工厂(EntityFactoryQos)策略
+该 QoS 策略控制实体充当其他实体的工厂时的行为。默认情况下，所有实体在创建时都是启用的，但如果将autoenable_created_entities的值更改为false,则新实体将在创建时禁用（请参阅EntityFactoryQosPolicy）。
+
+QoS策略数据成员列表：
+|数据成员名称|类型|默认值|
+|---|---|---|
+|autoenable_created_entities|bool|true|
+
+>笔记
+>
+>此 QoS 策略涉及DomainParticipantFactory（作为DomainParticipant的工厂）、DomainParticipant （作为Publisher、Subscriber和Topic的工厂）、 Publisher （作为DataWriter的工厂）和 Subscriber （作为DataReader的工厂）。
+它可以在已启用的实体上更改，但只会影响更改后创建的实体。
+
+**例子**
+
+*C++*
+```cpp
+EntityFactoryQosPolicy entity_factory;
+//The EntityFactoryQosPolicy is default constructed with autoenable_created_entities = true
+//Change it to false
+entity_factory.autoenable_created_entities = false;
+```
+
+##### 3.1.2.1.6.组数据(GroupData)Qos策略
+
+允许应用程序将附加信息附加到创建的发布者或订阅者。该数据对于属于发布者/订阅者的所有DataWriters / DataReader是公共的，并且通过内置主题进行传播（请参阅 参考资料GroupDataQosPolicy）。
+
+此 QoS 策略可以与 DataWriter 和 DataReader 监听器结合使用，以实现类似于 PartitionQosPolicy 的匹配策略。
+
+QoS 策略数据成员列表：
+
+|数据成员名称|类型|默认值|
+|---|---|---|
+|collection|std::vector<octet>|Empty vector|
+
+>注意
+>
+>该 QoS 策略涉及发布者和订阅者实体。
+它可以在启用的实体上更改。
+
+**例子**
+**C++**
+```cpp
+GroupDataQosPolicy group_data;
+//The GroupDataQosPolicy is default constructed with an empty collection
+//Collection is a private member so you need to use getters and setters to access
+//Add data to the collection
+std::vector<eprosima::fastrtps::rtps::octet> vec;
+vec = group_data.data_vec(); // Getter function
+
+//Add two new octets to group data vector
+eprosima::fastrtps::rtps::octet val = 3;
+vec.push_back(val);
+val = 10;
+vec.push_back(val);
+group_data.data_vec(vec); //Setter function
+```
+
+##### 3.1.2.1.7.HistoryQos策略
+当实例的值在成功传送到现有 DataReader 实体之前更改一次或多次时，此 QoS 策略控制系统的行为。
+
+>**译者注**
+>
+>在Datareader读取数据之前，可以缓存一条到多条数据，History在这里可以理解成缓存
+
+QoS 策略数据成员列表：
+
+|数据成员名称|类型|默认值|
+|---|---|---|
+|kind|历史Qos策略种类|KEEP_LAST_HISTORY_QOS|
+|depth|int32_t|1|
+
+- kind：控制服务是否应仅提供最新值、所有中间值或执行介于两者之间的操作。有关更多详细信息，请参阅HistoryQosPolicyKind 。
+
+- depth：建立在历史记录中必须保留的最大样本数。仅当kind设置为KEEP_LAST_HISTORY_QOS时才有效，并且它需要与ResourceLimitsQosPolicy保持一致，这意味着其值必须小于或等于max_samples_per_instance。
+
+>**注意**
+>
+>该 QoS 策略涉及主题、数据写入器和数据读取器实体。
+它无法在已启用的实体上更改。
+
+**历史Qos策略种类**  
+有两个可能的值（请参阅HistoryQosPolicyKind）：
+
+- `KEEP_LAST_HISTORY_QOS`：服务将仅尝试保留实例的最新值并丢弃旧值。保留和交付的最大样本数`由HistoryQosPolicy`的`深度`定义，该深度需要与ResourceLimitsQosPolicy设置保持一致。如果达到深度定义的限制，系统将丢弃最旧的样本，为新样本腾出空间。
+
+- `KEEP_ALL_HISTORY_QOS`：服务将尝试保留实例的所有值，直到可以将其传递给所有现有订阅者。如果选择此选项，深度将不会产生任何影响，因此历史记录仅受ResourceLimitsQosPolicy中设置的值的限制。
+
+**一致性规则**
+HistoryQos 必须与ResourceLimitsQosPolicy设置一致，而且还必须与DurabilityQosPolicy和ReliabilityQosPolicy等其他 QoS一致，因此需要考虑以下几种情况：
+
+- 仅当kind设置为KEEP_LAST_HISTORY_QOS时才考虑depth。
+
+- depth参数必须与ResourceLimitsQosPolicy设置保持一致，这意味着depth必须小于或等于ResourceLimitsQosPolicy的max_samples_per_instance。此外，max_samples必须等于或高于max_samples_per_instance乘以max_instances的乘积。
+
+- depth参数不能小于或等于零。如果需要无限深度，请考虑使用kind设置为 `KEEP_ALL_HISTORY_QOS`。
+
+- 将kind设置为KEEP_ALL_HISTORY_QOS意味着限制由ResourceLimitsQosPolicy的限制设置（max_samples_per_instance优先于max_samples）所确定
+
+- 在ReliabilityQosPolicy的ReliabilityQosPolicyKind设置为RELIABLE_RELIABILITY_QOS且HistoryQosPolicy的kind设置为KEEP_ALL_HISTORY_QOS的情况下，当达到资源限制时，服务的行为取决于DurabilityQosPolicy：
+
+    - 如果DurabilityQosPolicy的kind配置为VOLATILE_DURABILITY_QOS，则DataWriter的write()调用将丢弃历史记录中最旧的样本。请注意，被移除的样本可能属于与新写入样本不同的实例。
+
+    - 如果DurabilityQosPolicy的kind配置为TRANSIENT_LOCAL_DURABILITY_QOS或TRANSIENT_DURABILITY_QOS，则DataWriter的write()调用将被阻塞，直到历史记录有足够空间存放新样本。
+
+**例子**  
+*C++*
+```cpp
+HistoryQosPolicy history;
+//The HistoryQosPolicy is default constructed with kind = KEEP_LAST and depth = 1.
+//Change the depth to 20
+history.depth = 20;
+//You can also change the kind to KEEP_ALL but after that the depth will not have effect.
+history.kind = KEEP_ALL_HISTORY_QOS;
+```
+##### 3.1.2.1.8.延迟预算Qos策略
+>**警告**
+>
+>此 QoS 策略将在未来版本中实施。
+[TODO 待补全]
 

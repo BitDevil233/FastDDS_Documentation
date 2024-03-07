@@ -180,4 +180,445 @@ wget -0 HelloWorldPublisher.cpp \ https://raw.githubusercontent.com/eProsima/Fas
 下面一个代码块包括允许使用FastDDS API的C++头文件。
 - DomainParticipantFactory:允许创建和销毁domainparticipant对象
 - DomainParticipant:充当所有其它实体对象
+- DomainParticipantFactory:允许创建和销毁domainparticipant对象
+- DomainParticipant:充当所有其它实体对象
+- TypeSupport:为Participant提供序列化、反序列化和获取特定数据类型的键的函数。
+- Publisher：它是负责创建datawriter的对象。
+- DataWriter：允许应用程序设置要在给定Topic下发布的数据的值。
+- DataWriterListener：允许重新定义DataWriterListener的函数。
+```cpp
+    #include <chrono>
+    #include <thread>
+
+    #include <fastdds/dds/domain/DomainParticipant.hpp>
+    #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+    #include <fastdds/dds/publisher/DataWriter.hpp>
+    #include <fastdds/dds/publisher/DataWriterListener.hpp>
+    #include <fastdds/dds/publisher/Publisher.hpp>
+    #include <fastdds/dds/topic/TypeSupport.hpp>
+```
+接下来，定义包含我们将在应用程序中使用的eProsima Fast DDS类和函数的名称空间。
+```cpp
+    using namespace eprosima::fastdds::dds;
+```
+下一行创建实现发布者的HelloWorldPublisher类。
+```cpp
+    class HelloWorldPublisher
+```
+继续讨论类的私有数据成员，hello_数据成员被定义为HelloWorld类的对象，该类定义了我们用IDL文件创建的数据类型。接下来，定义与参与者、发布者、主题、DataWriter和数据类型相对应的私有数据成员。TypeSupport类的type_对象是将用于在DomainParticipant中注册主题数据类型的对象。
+```cpp
+private:
+
+    HelloWorld hello_;
+
+    DomainParticipant* participant_;
+
+    Publisher* publisher_;
+
+    Topic* topic_;
+
+    DataWriter* writer_;
+
+    TypeSupport type_;
+```
+然后，通过继承DataWriterListener类来定义PubListener类。该类重载默认的DataWriter侦听器回调函数，允许在发生事件时执行例程。重载的的回调函数on_publication_matched()允许在检测到新DataReader在侦听（DataWriter发布的Topic）时定义一系列操作。info.current_count_change()用于检测与DataWriter匹配的DataReader的这些更改。这是MatchedStatus结构体中的一个成员，它允许跟踪状态的变化。最后，类的listener_对象被定义为PubListener的一个实例。
+```cpp
+class PubListener : public DataWriterListener
+{
+public:
+
+    PubListener()
+        : matched_(0)
+    {
+    }
+
+    ~PubListener() override
+    {
+    }
+
+    void on_publication_matched(
+            DataWriter*,
+            const PublicationMatchedStatus& info) override
+    {
+        if (info.current_count_change == 1)
+        {
+            matched_ = info.total_count;
+            std::cout << "Publisher matched." << std::endl;
+        }
+        else if (info.current_count_change == -1)
+        {
+            matched_ = info.total_count;
+            std::cout << "Publisher unmatched." << std::endl;
+        }
+        else
+        {
+            std::cout << info.current_count_change
+                    << " is not a valid value for PublicationMatchedStatus current count change." << std::endl;
+        }
+    }
+
+    std::atomic_int matched_;
+
+} listener_;
+```
+HelloWorldPublisher类的公共构造函数和析构函数定义如下。构造函数将类的私有数据成员初始化为nullptr，但TypeSupport对象例外，它被初始化为HelloWorldPubSubType类的实例。类析构函数删除这些成员变量，从而清理系统内存。
+```cpp
+    HelloWorldPublisher()
+        : participant_(nullptr)
+        , publisher_(nullptr)
+        , topic_(nullptr)
+        , writer_(nullptr)
+        , type_(new HelloWorldPubSubType())
+    {
+    }
+
+    virtual ~HelloWorldPublisher()
+    {
+        if (writer_ != nullptr)
+        {
+            publisher_->delete_datawriter(writer_);
+        }
+        if (publisher_ != nullptr)
+        {
+            participant_->delete_publisher(publisher_);
+        }
+        if (topic_ != nullptr)
+        {
+            participant_->delete_topic(topic_);
+        }
+        DomainParticipantFactory::get_instance()->delete_participant(participant_);
+    }
+```
+继续看HelloWorldPublisher类的公共成员函数，下一段代码定义公共发布者的初始化成员函数。这个函数执行几个动作:
+1.初始化HelloWorld类型hello_结构成员的内容。 
+2.通过DomainParticipant的QoS为Participant分配一个名称。
+3.使用DomainParticipantFactory创建Participant。
+4.注册IDL中定义的数据类型。 
+5.为发布创建topic。
+6.创建publisher。
+7.使用先前创建的listener创建DataWriter。
+可以看到，除了participant的名字之外，所有实体的QoS配置都是默认配置(PARTICIPANT_QOS_DEFAULT, PUBLISHER_QOS_DEFAULT, TOPIC_QOS_DEFAULT, DATAWRITER_QOS_DEFAULT)。每个DDS实体的QoS的缺省值可以在DDS标准中查看。
+```cpp
+    //!Initialize the publisher
+bool init()
+{
+    hello_.index(0);
+    hello_.message("HelloWorld");
+
+    DomainParticipantQos participantQos;
+    participantQos.name("Participant_publisher");
+    participant_ = DomainParticipantFactory::get_instance()->create_participant(0, participantQos);
+
+    if (participant_ == nullptr)
+    {
+        return false;
+    }
+
+    // Register the Type
+    type_.register_type(participant_);
+
+    // Create the publications Topic
+    topic_ = participant_->create_topic("HelloWorldTopic", "HelloWorld", TOPIC_QOS_DEFAULT);
+
+    if (topic_ == nullptr)
+    {
+        return false;
+    }
+
+    // Create the Publisher
+    publisher_ = participant_->create_publisher(PUBLISHER_QOS_DEFAULT, nullptr);
+
+    if (publisher_ == nullptr)
+    {
+        return false;
+    }
+
+    // Create the DataWriter
+    writer_ = publisher_->create_datawriter(topic_, DATAWRITER_QOS_DEFAULT, &listener_);
+
+    if (writer_ == nullptr)
+    {
+        return false;
+    }
+    return true;
+}
+```
+为了发布，实现了公共成员函数publish()。在DataWriter的侦听器（listener）回调中(声明DataWriter已经与侦听发布主题的DataReader匹配)，数据成员matched_被更新。它包含发现的datareader的数量。因此，当发现第一个DataReader时，应用程序开始发布。这只是通过DataWriter对象写入更改。
+```cpp
+    //!Send a publication
+bool publish()
+{
+    if (listener_.matched_ > 0)
+    {
+        hello_.index(hello_.index() + 1);
+        writer_->write(&hello_);
+        return true;
+    }
+    return false;
+}
+```
+公有的run函数执行发布给定次数的操作，在发布之间等待1秒。
+```cpp
+    //!Run the Publisher
+void run(
+        uint32_t samples)
+{
+    uint32_t samples_sent = 0;
+    while (samples_sent < samples)
+    {
+        if (publish())
+        {
+            samples_sent++;
+            std::cout << "Message: " << hello_.message() << " with index: " << hello_.index()
+                        << " SENT" << std::endl;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+}
+```
+最后，初始化HelloWorldPublisher并在main函数中运行。
+```cpp
+    int main(
+        int argc,
+        char** argv)
+{
+    std::cout << "Starting publisher." << std::endl;
+    uint32_t samples = 10;
+
+    HelloWorldPublisher* mypub = new HelloWorldPublisher();
+    if(mypub->init())
+    {
+        mypub->run(samples);
+    }
+
+    delete mypub;
+    return 0;
+}
+```
+#### 1.3.7.2. CMakeLists.txt
+在前面创建的CMakeList.txt文件的末尾包含以下代码片段。这将添加构建可执行文件所需的所有源文件，并将可执行文件和库链接在一起。
+```cmake
+    add_executable(DDSHelloWorldPublisher src/HelloWorldPublisher.cpp ${DDS_HELLOWORLD_SOURCES_CXX})
+    target_link_libraries(DDSHelloWorldPublisher fastrtps fastcdr)
+```
+此时，项目已准备好构建、编译和运行发布者应用程序。在工作区的构建目录中，运行以下命令。
+```shell
+    cmake ..
+    cmake --build .
+    ./DDSHelloWorldPublisher
+```
+1.3.8. 编写Fast DDS subscriber
+从工作区的src目录中，执行以下命令下载HelloWorldSubscriber.cpp文件。
+```shell
+wget -O HelloWorldSubscriber.cpp \
+    https://raw.githubusercontent.com/eProsima/Fast-RTPS-docs/master/code/Examples/C++/DDSHelloWorld/src/HelloWorldSubscriber.cpp
+```
+这是订阅器应用程序的c++源代码。应用程序运行订阅器，直到在主题HelloWorldTopic下收到10个示例。此时，订阅器停止。
+```cpp
+    //长代码
+```
+#### 1.3.8.1. 代码检查
+由于Publisher和subscriber应用程序的源代码在很大程度上是相同的，因此本文将重点讨论它们之间的主要区别，省略已经解释过的代码部分。按照与Publisher解释中相同的结构，第一步是包含c++头文件。在这些文件中，包含publisher类的文件由subscriber类替换，而包含datawriter类的文件由datareader类替换。
+- subscriber：它是负责创建和配置datareader的对象。
+- DataReader：它是负责实际接收数据的对象。它在应用程序中注册topic(TopicDescription)，该topic标识要读取的数据并访问订阅者接收到的数据。 
+- DataReaderListener：这是分配给data reader的listener。
+- DataReaderQoS：结构体，该结构体定义了DataReader的QoS。
+- SampleInfo：“读取”或“采集”的是每个样本附带的信息。
+```cpp
+    #include <fastdds/dds/domain/DomainParticipant.hpp>
+    #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+    #include <fastdds/dds/subscriber/DataReader.hpp>
+    #include <fastdds/dds/subscriber/DataReaderListener.hpp>
+    #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
+    #include <fastdds/dds/subscriber/SampleInfo.hpp>
+    #include <fastdds/dds/subscriber/Subscriber.hpp>
+    #include <fastdds/dds/topic/TypeSupport.hpp>
+```
+下一行定义了实现subscriber的HelloWorldSubscriber类。
+```cpp
+    class HelloWorldSubscriber
+```
+从类的私有成员变量开始，值得一提的是data reader的listener实现。类的私有成员变量将是participant、subscriber、topic、data reader和data type。与data writer的情况一样，listener实现在事件发生时要执行的回调函数。SubListener的第一个被覆写的回调函数是on_subscription_matched()，它类似于DataWriter的on_publication_matched()回调函数。
+```cpp
+    void on_subscription_matched(
+        DataReader*,
+        const SubscriptionMatchedStatus& info) override
+{
+    if (info.current_count_change == 1)
+    {
+        std::cout << "Subscriber matched." << std::endl;
+    }
+    else if (info.current_count_change == -1)
+    {
+        std::cout << "Subscriber unmatched." << std::endl;
+    }
+    else
+    {
+        std::cout << info.current_count_change
+                << " is not a valid value for SubscriptionMatchedStatus current count change" << std::endl;
+    }
+}
+```
+第二个被重写的回调函数是on_data_available()。在这种情况下，data reader可以访问的下一个接收样本被获取，并被处理以显示样本内容。在这里定义了SampleInfo类的对象，它确定是否已经读取或获取了样本。每次读取一个样本，接收到的样本计数器就会增加。
+```cpp
+    void on_data_available(
+        DataReader* reader) override
+{
+    SampleInfo info;
+    if (reader->take_next_sample(&hello_, &info) == ReturnCode_t::RETCODE_OK)
+    {
+        if (info.valid_data)
+        {
+            samples_++;
+            std::cout << "Message: " << hello_.message() << " with index: " << hello_.index()
+                        << " RECEIVED." << std::endl;
+        }
+    }
+}
+```
+类的公有构造函数和析构函数定义如下。
+```cpp
+    HelloWorldSubscriber()
+    : participant_(nullptr)
+    , subscriber_(nullptr)
+    , topic_(nullptr)
+    , reader_(nullptr)
+    , type_(new HelloWorldPubSubType())
+{
+}
+
+virtual ~HelloWorldSubscriber()
+{
+    if (reader_ != nullptr)
+    {
+        subscriber_->delete_datareader(reader_);
+    }
+    if (topic_ != nullptr)
+    {
+        participant_->delete_topic(topic_);
+    }
+    if (subscriber_ != nullptr)
+    {
+        participant_->delete_subscriber(subscriber_);
+    }
+    DomainParticipantFactory::get_instance()->delete_participant(participant_);
+}
+```
+接下来是subscriber初始化公有成员函数。这与为HelloWorldPublisher定义的初始化公有成员函数相同。除participant’s name外，所有实体的QoS配置均为默认QoS (PARTICIPANT_QOS_DEFAULT、SUBSCRIBER_QOS_DEFAULT、TOPIC_QOS_DEFAULT、DATAREADER_QOS_DEFAULT)。每个DDS实体的QoS的缺省值可以在DDS标准中查看。
+```cpp
+    //!Initialize the subscriber
+bool init()
+{
+    DomainParticipantQos participantQos;
+    participantQos.name("Participant_subscriber");
+    participant_ = DomainParticipantFactory::get_instance()->create_participant(0, participantQos);
+
+    if (participant_ == nullptr)
+    {
+        return false;
+    }
+
+    // Register the Type
+    type_.register_type(participant_);
+
+    // Create the subscriptions Topic
+    topic_ = participant_->create_topic("HelloWorldTopic", "HelloWorld", TOPIC_QOS_DEFAULT);
+
+    if (topic_ == nullptr)
+    {
+        return false;
+    }
+
+    // Create the Subscriber
+    subscriber_ = participant_->create_subscriber(SUBSCRIBER_QOS_DEFAULT, nullptr);
+
+    if (subscriber_ == nullptr)
+    {
+        return false;
+    }
+
+    // Create the DataReader
+    reader_ = subscriber_->create_datareader(topic_, DATAREADER_QOS_DEFAULT, &listener_);
+
+    if (reader_ == nullptr)
+    {
+        return false;
+    }
+
+    return true;
+}
+```
+公有成员函数run()确保subscriber一直运行，直到接收到所有sample。该成员函数实现subscriber的活动等待，并使用100ms的睡眠间隔来缓解CPU的压力。
+```cpp
+    //!Run the Subscriber
+void run(
+    uint32_t samples)
+{
+    while(listener_.samples_ < samples)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+```
+最后，实现subscriber的participant被初始化并在main中运行。
+```cpp
+    int main(
+        int argc,
+        char** argv)
+{
+    std::cout << "Starting subscriber." << std::endl;
+    uint32_t samples = 10;
+
+    HelloWorldSubscriber* mysub = new HelloWorldSubscriber();
+    if(mysub->init())
+    {
+        mysub->run(samples);
+    }
+
+    delete mysub;
+    return 0;
+}
+```
+#### 1.3.8.2. CMakeLists.txt
+在前面创建的CMakeList.txt文件的末尾包含以下代码片段。这将添加构建可执行文件所需的所有源文件，并将可执行文件和库链接在一起。
+```cmake
+    add_executable(DDSHelloWorldSubscriber src/HelloWorldSubscriber.cpp ${DDS_HELLOWORLD_SOURCES_CXX})
+    target_link_libraries(DDSHelloWorldSubscriber fastrtps fastcdr)
+```
+此时，项目已准备好构建、编译和运行Subscriber应用程序。在工作区的构建目录中，运行以下命令。
+```shell
+    cmake ..
+    cmake --build .
+    ./DDSHelloWorldSubscriber
+```
+### 1.3.9. 综上
+最后，在构建目录中，从两个终端运行publisher和subscriber应用程序。
+```shell
+    ./DDSHelloWorldPublisher
+    ./DDSHelloWorldSubscriber
+```
+### 1.3.10. 总结
+在本教程中，您构建了一个publisher和一个subscriber DDS应用程序。您还学习了如何构建用于源代码编译的CMake文件，以及如何在项目中包含和使用Fast DDS和Fast CDR库。
+### 1.3.11. 下一个步骤
+在eProsima Fast DDS Github存储库中，您将找到更复杂的示例，这些示例为大量用例和场景实现了DDS通信。你可以在这里找到它们。
+
+
+
+
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
     

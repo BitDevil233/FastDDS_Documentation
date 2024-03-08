@@ -290,13 +290,13 @@ HelloWorldPublisher类的公共构造函数和析构函数定义如下。构造�
     }
 ```
 继续看HelloWorldPublisher类的公共成员函数，下一段代码定义公共发布者的初始化成员函数。这个函数执行几个动作:
-1.初始化HelloWorld类型hello_结构成员的内容。 
-2.通过DomainParticipant的QoS为Participant分配一个名称。
-3.使用DomainParticipantFactory创建Participant。
-4.注册IDL中定义的数据类型。 
-5.为发布创建topic。
-6.创建publisher。
-7.使用先前创建的listener创建DataWriter。
+1. 初始化HelloWorld类型hello_结构成员的内容。 
+2. 通过DomainParticipant的QoS为Participant分配一个名称。
+3. 使用DomainParticipantFactory创建Participant。
+4. 注册IDL中定义的数据类型。 
+5. 为发布创建topic。
+6. 创建publisher。
+7. 使用先前创建的listener创建DataWriter。
 可以看到，除了participant的名字之外，所有实体的QoS配置都是默认配置(PARTICIPANT_QOS_DEFAULT, PUBLISHER_QOS_DEFAULT, TOPIC_QOS_DEFAULT, DATAWRITER_QOS_DEFAULT)。每个DDS实体的QoS的缺省值可以在DDS标准中查看。
 ```cpp
     //!Initialize the publisher
